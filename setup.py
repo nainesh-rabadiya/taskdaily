@@ -1,12 +1,14 @@
 from setuptools import setup, find_packages
 import os
 
+
 def read(fname):
     with open(os.path.join(os.path.dirname(__file__), fname), encoding="utf-8") as f:
         return f.read()
 
+
 # Read version from version.py
-__version__ = "0.1.6"
+__version__ = "2.0.0"
 
 setup(
     name="taskdaily",
@@ -51,4 +53,4 @@ setup(
     },
     include_package_data=True,
     keywords="task-management daily-tasks project-management productivity",
-) 
+)

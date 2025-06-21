@@ -1,16 +1,5 @@
-from .manager import config_manager, ConfigManager
-from .defaults import (
-    DEFAULT_STATUS,
-    DEFAULT_PROJECTS,
-    DEFAULT_LOGGING,
-    DEFAULT_BACKUP
-)
+"""Configuration management for TaskDaily."""
 
-__all__ = [
-    'config_manager',
-    'ConfigManager',
-    'DEFAULT_STATUS',
-    'DEFAULT_PROJECTS',
-    'DEFAULT_LOGGING',
-    'DEFAULT_BACKUP'
-] 
+from .config_manager import ConfigManager
+
+__all__ = ["ConfigManager"]
