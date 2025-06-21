@@ -1,6 +1,9 @@
 from pathlib import Path
 from typing import Optional
 from datetime import datetime, timedelta
+from rich.console import Console
+
+console = Console()
 
 def ensure_directory_exists(path: Path) -> None:
     """Ensure directory exists, create if it doesn't."""
@@ -32,10 +35,26 @@ def write_file_content(file_path: Path, content: str) -> None:
 
 def read_file(file_path: str) -> str:
     """Read content from a file."""
-    with open(file_path, 'r', encoding='utf-8') as f:
-        return f.read()
+    console.print(f"Reading file: {file_path}")
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            console.print(f"Successfully read {len(content)} characters")
+            return content
+    except FileNotFoundError:
+        console.print(f"File not found: {file_path}", style="red")
+        raise
+    except Exception as e:
+        console.print(f"Error reading file {file_path}: {e}", style="red")
+        raise
 
 def write_file(file_path: str, content: str) -> None:
     """Write content to a file."""
-    with open(file_path, 'w', encoding='utf-8') as f:
-        f.write(content) 
+    console.print(f"Writing to file: {file_path}")
+    try:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+            console.print(f"Successfully wrote {len(content)} characters")
+    except Exception as e:
+        console.print(f"Error writing to file {file_path}: {e}", style="red")
+        raise 

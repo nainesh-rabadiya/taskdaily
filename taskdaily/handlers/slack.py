@@ -16,6 +16,7 @@ class SlackHandler(OutputHandler):
 
     def format_content(self, tasks: Dict[str, Any], date: datetime, is_report: bool = False) -> str:
         """Format tasks for Slack message."""
+        rprint(f"\nDebug: Received tasks: {tasks}")
         return self.formatter.format_message(tasks, date, is_report)
 
     def send(self, content: str, **kwargs) -> bool:
@@ -54,6 +55,9 @@ class SlackHandler(OutputHandler):
             "➡️": "arrow_right",
             "✅": "white_check_mark",
             "🚫": "no_entry",
+            "🏠": "house",
+            "💼": "briefcase",
+            "📚": "books",
             # Add more mappings as needed
         }
         return emoji_map.get(emoji, "question")  # Default to :question: if not found 

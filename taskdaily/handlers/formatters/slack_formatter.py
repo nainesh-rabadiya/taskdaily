@@ -68,6 +68,13 @@ class SlackFormatter:
         """Convert markdown task format to Slack format."""
         # Remove markdown checkbox and add better bullet points
         task = task.replace("- [ ]", "○").replace("- [x]", "●")
+        
+        # Convert status emojis
+        for status in self.status_info.values():
+            emoji = status['emoji']
+            if emoji in task:
+                task = task.replace(emoji, f":{self._get_slack_emoji_name(emoji)}:")
+        
         return task
 
     def _init_emoji_map(self) -> None:
@@ -81,6 +88,9 @@ class SlackFormatter:
             "➡️": "arrow_right",
             "✅": "white_check_mark",
             "🚫": "no_entry",
+            "🏠": "house",
+            "💼": "briefcase",
+            "📚": "books",
         }
         
         # Add any custom emojis from config
@@ -88,4 +98,8 @@ class SlackFormatter:
             emoji = status['emoji']
             if emoji not in self._emoji_map:
                 name = status['name'].lower().replace(" ", "_")
-                self._emoji_map[emoji] = name 
+                self._emoji_map[emoji] = name
+
+    def _get_slack_emoji_name(self, emoji: str) -> str:
+        """Convert Unicode emoji to Slack emoji name."""
+        return self._emoji_map.get(emoji, "question")  # Default to :question: if not found 

@@ -4,6 +4,7 @@ from typing import Dict, List, Any, Optional
 import click
 from rich.console import Console
 import os
+import re
 
 from .utils import get_date_parts, clean_section_header, split_into_sections, get_status_info
 from . import config_manager
@@ -18,37 +19,62 @@ class TaskManager:
     
     def __init__(self, work_dir: Optional[Path] = None):
         self.config = config_manager.get_config()
-        self.work_dir = work_dir or Path.cwd()
+        self.work_dir = Path(os.getcwd()) if work_dir is None else Path(work_dir)
         self.status_info = get_status_info()
+        console.print(f"TaskManager initialized with work_dir: {self.work_dir}")
 
     def get_tasks_for_date(self, date: datetime) -> Dict[str, List[str]]:
         """Get all tasks for a specific date."""
-        file_path = get_file_path(date)
+        year, month, day = get_date_parts(date)
+        file_name = self.config["daily_file_name"].format(year=year, month=month, day=day)
+        file_path = self.work_dir / year / month / day / file_name
+        
+        console.print(f"Looking for file: {file_path}")
         
         if not os.path.exists(file_path):
+            console.print(f"File not found: {file_path}")
             return {}
             
-        content = read_file(file_path)
-        sections = split_into_sections(content)
+        content = read_file(str(file_path))
         tasks_by_project = {}
         
-        for section in sections:
-            lines = section.strip().split('\n')
-            if not lines:
+        # Split content into lines and process
+        lines = content.split('\n')
+        current_project = None
+        current_tasks = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
                 continue
                 
-            header = lines[0].strip()
-            if not any(f"{emoji} {project['name']}" in header 
-                      for project in self.config["projects"] 
-                      for emoji in [project["emoji"]]):
+            # Check if this is a project line
+            project_found = False
+            for project in self.config["projects"]:
+                if line.startswith(project["emoji"]):
+                    # Save previous project's tasks
+                    if current_project and current_tasks:
+                        tasks_by_project[current_project] = current_tasks
+                        current_tasks = []
+                    
+                    current_project = f"{project['emoji']} {project['name']}"
+                    console.print(f"Found project section: {current_project}")
+                    project_found = True
+                    break
+                    
+            if project_found:
                 continue
+                    
+            # If we're in a project section and this is a task, collect it
+            if current_project and line.startswith('- ['):
+                current_tasks.append(line)
+                console.print(f"Added task to {current_project}: {line}")
+        
+        # Don't forget to save the last project's tasks
+        if current_project and current_tasks:
+            tasks_by_project[current_project] = current_tasks
                 
-            project_name = clean_section_header(header)
-            tasks = [line.strip() for line in lines[1:] if line.strip().startswith('- [')]
-            
-            if tasks:
-                tasks_by_project[project_name] = tasks
-                
+        console.print(f"Found tasks: {tasks_by_project}")
         return tasks_by_project
 
     def get_incomplete_tasks(self, date: datetime) -> Dict[str, List[str]]:
@@ -92,10 +118,14 @@ class TaskManager:
         if date is None:
             date = datetime.now()
         
-        file_path = get_file_path(date)
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        year, month, day = get_date_parts(date)
+        file_name = self.config["daily_file_name"].format(year=year, month=month, day=day)
+        file_path = self.work_dir / year / month / day / file_name
         
         if not os.path.exists(file_path):
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(str(file_path)), exist_ok=True)
+            
             # Get template and tasks
             template = self._get_template()
             
@@ -105,7 +135,7 @@ class TaskManager:
             if not template_only:
                 # First check yesterday's date
                 yesterday = date - timedelta(days=1)
-                yesterday_file = get_file_path(yesterday)
+                yesterday_file = self.work_dir / get_date_parts(yesterday)[0] / get_date_parts(yesterday)[1] / get_date_parts(yesterday)[2] / self.config["daily_file_name"].format(year=get_date_parts(yesterday)[0], month=get_date_parts(yesterday)[1], day=get_date_parts(yesterday)[2])
                 
                 # Then find the most recent available date
                 last_date = self.find_last_available_date(date)
@@ -127,28 +157,31 @@ class TaskManager:
             
             # Generate content
             content = self._generate_daily_content(date, template, last_date if use_last_date else None)
-            write_file(file_path, content)
+            write_file(str(file_path), content)
             console.print(f"✅ Created daily file: {file_path}", style="green")
         else:
             console.print(f"⚠️ Daily file already exists: {file_path}", style="yellow")
         
-        return file_path
+        return str(file_path)
 
     def complete_task(self, task_name: str, category: str, date: datetime) -> bool:
         """Mark a task as complete."""
-        file_path = get_file_path(date)
+        year, month, day = get_date_parts(date)
+        file_name = self.config["daily_file_name"].format(year=year, month=month, day=day)
+        file_path = self.work_dir / year / month / day / file_name
+        
         if not os.path.exists(file_path):
             return False
         
-        content = read_file(file_path)
+        content = read_file(str(file_path))
         lines = content.split('\n')
         found = False
         
         for i, line in enumerate(lines):
-            if category in line and '##' in line:  # Found category section
+            if category in line and not line.startswith('##'):  # Found category section
                 # Look for the task in the following lines until next section
                 j = i + 1
-                while j < len(lines) and not (lines[j].startswith('##')):
+                while j < len(lines) and not any(p["emoji"] in lines[j] for p in self.config["projects"]):
                     if task_name in lines[j] and '[ ]' in lines[j]:
                         lines[j] = lines[j].replace('[ ]', '[x]')
                         lines[j] = lines[j].replace('📝', '✅')
@@ -159,7 +192,7 @@ class TaskManager:
                     break
         
         if found:
-            write_file(file_path, '\n'.join(lines))
+            write_file(str(file_path), '\n'.join(lines))
             return True
         return False
 
@@ -168,7 +201,9 @@ class TaskManager:
         try:
             check_date = current_date - timedelta(days=1)
             for _ in range(30):
-                check_file = get_file_path(check_date)
+                year, month, day = get_date_parts(check_date)
+                file_name = self.config["daily_file_name"].format(year=year, month=month, day=day)
+                check_file = self.work_dir / year / month / day / file_name
                 if os.path.exists(check_file):
                     return check_date
                 check_date -= timedelta(days=1)
@@ -194,18 +229,42 @@ class TaskManager:
             f"{info['emoji']} {info['name']}" for info in status_info.values()
         ])
         
+        # Get tasks from previous date if available
+        tasks_by_project = {}
+        if last_date:
+            tasks_by_project = self.get_incomplete_tasks(last_date)
+            
+        # Get planned emoji from config
+        planned_emoji = next(
+            (info['emoji'] for info in status_info.values() 
+             if info.get('name', '').lower() == 'planned'),
+            "📝"  # Fallback emoji
+        )
+        
         # Generate project sections
         project_sections = []
-        template_data = {'date': date.strftime("%Y-%m-%d")}
-        
         for project in self.config["projects"]:
             project_name = project["name"]
             project_emoji = project["emoji"]
-            tasks = self.get_project_tasks(project_name, project_emoji, date, last_date)
-            project_sections.append(f"{project_emoji} {project_name}\n{tasks}")
-
-        template_data['projects'] = '\n\n'.join(project_sections)
-        template_data['status_legend'] = status_legend
+            
+            tasks = []
+            if last_date and f"{project_emoji} {project_name}" in tasks_by_project:
+                tasks.extend(tasks_by_project[f"{project_emoji} {project_name}"])
+            
+            # Always add a new task template
+            tasks.append(f"- [ ] New task {planned_emoji}")
+            
+            # Add project section without ## prefix
+            project_section = f"{project_emoji} {project_name}\n"
+            project_section += "\n".join(tasks)
+            project_sections.append(project_section)
+            
+        # Replace template variables
+        template_data = {
+            'date': date.strftime("%Y-%m-%d"),
+            'status_legend': status_legend,
+            'projects': '\n\n'.join(project_sections)
+        }
         
         return template.format(**template_data)
 
@@ -214,18 +273,9 @@ class TaskManager:
         return """# Daily Tasks - {date}
 
 ## Status Legend
-📝 Planned | ⚡ In Progress | 🚧 Blocked | 📅 Rescheduled | ➡️ Carried Forward | ✅ Completed | 🚫 Cancelled
+{status_legend}
 
-## Tasks
-
-🏠 Personal
-- [ ] New task 📝
-
-💼 Work
-- [ ] New task 📝
-
-📚 Learning
-- [ ] New task 📝
+{projects}
 
 ## Notes
 - 
@@ -243,7 +293,9 @@ class TaskManager:
         """Get tasks for a project, including carried forward tasks."""
         try:
             prev_date = last_available_date if last_available_date else (date_obj - timedelta(days=1))
-            prev_file = get_file_path(prev_date)
+            year, month, day = get_date_parts(prev_date)
+            file_name = self.config["daily_file_name"].format(year=year, month=month, day=day)
+            prev_file = self.work_dir / year / month / day / file_name
             
             tasks = []
             status_info = get_status_info()
@@ -258,25 +310,32 @@ class TaskManager:
             )
             
             if os.path.exists(prev_file):
-                content = read_file(prev_file)
-                sections = split_into_sections(content)
+                content = read_file(str(prev_file))
+                lines = content.split('\n')
+                in_project = False
                 
-                # Find the project section
-                for section in sections:
-                    section_lines = section.strip().split('\n')
-                    if not section_lines:
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                        
+                    # Check if this is our project section
+                    if line.startswith(f"{emoji}"):
+                        in_project = True
                         continue
                     
-                    header = clean_section_header(section_lines[0])
-                    if header == f"{emoji} {project_name}":
-                        for line in section_lines[1:]:  # Skip header
-                            if line.strip().startswith('- ['):
-                                # Only transfer non-completed tasks
-                                if not any(emoji in line for emoji in completed_emojis):
-                                    # Skip template tasks
-                                    if not line.strip().endswith(f"New task {planned_emoji}"):
-                                        tasks.append(line.strip())
-                        break
+                    # Check if we're entering a new project section
+                    if any(p["emoji"] in line for p in self.config["projects"]):
+                        in_project = False
+                        continue
+                    
+                    # If we're in our project section and this is a task
+                    if in_project and line.startswith('- ['):
+                        # Only transfer non-completed tasks
+                        if not any(emoji in line for emoji in completed_emojis):
+                            # Skip template tasks
+                            if not line.strip().endswith(f"New task {planned_emoji}"):
+                                tasks.append(line.strip())
             
             # Always add a new task template with planned emoji from config
             tasks.append(f"- [ ] New task {planned_emoji}")
