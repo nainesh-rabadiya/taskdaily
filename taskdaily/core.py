@@ -149,37 +149,53 @@ class DailyManager:
             
             tasks = []
             status_info = get_status_info()
+            
+            # Get status emojis from config
             completed_emojis = [info['emoji'] for info in status_info.values() 
                               if info.get('name', '').lower() in ['completed', 'cancelled']]
+            carried_forward_emoji = next(
+                (info['emoji'] for info in status_info.values() 
+                 if info.get('name', '').lower() == 'carried_forward'),
+                "➡️"
+            )
+            planned_emoji = next(
+                (info['emoji'] for info in status_info.values() 
+                 if info.get('name', '').lower() == 'planned'),
+                "📝"
+            )
             
             if prev_file.exists():
                 content = prev_file.read_text()
                 sections = split_into_sections(content)
                 
-                section_header = f"{emoji} {project_name}"
+                # Find the project section
                 for section in sections:
                     section_lines = section.strip().split('\n')
                     if not section_lines:
                         continue
                     
                     header = clean_section_header(section_lines[0])
-                    if header == section_header:
-                        for line in section_lines:
+                    if header == f"{emoji} {project_name}":
+                        for line in section_lines[1:]:  # Skip header
                             if line.strip().startswith('- ['):
                                 # Check if task is not completed using dynamic emojis
                                 if not any(emoji in line for emoji in completed_emojis):
                                     if not any(template in line for template in self.config["template_content"]["tasks"]):
-                                        tasks.append(line.strip())
+                                        # Add carried forward emoji to tasks from previous dates
+                                        if last_available_date and (date_obj - last_available_date).days > 1:
+                                            tasks.append(f"{line.strip()} {carried_forward_emoji}")
+                                        else:
+                                            tasks.append(line.strip())
                         break
             
-            # Get the planned emoji from config
-            planned_emoji = next((info['emoji'] for info in status_info.values() 
-                                if info.get('name', '').lower() == 'planned'), "📝")
+            # Always add a new task template with planned emoji from config
             tasks.append(f"- [ ] New task {planned_emoji}")
             return '\n'.join(tasks)
+            
         except Exception as e:
             console.print(f"⚠️ Error getting tasks for {project_name}: {e}", style="yellow")
-            return "- [ ] New task 📝"
+            # Use planned emoji from config even in error case
+            return f"- [ ] New task {planned_emoji}"
 
     def create_day_file(self, date_obj: datetime, template_only: bool = False) -> None:
         """Create daily log file and update monthly README."""
@@ -193,20 +209,32 @@ class DailyManager:
             if not daily_file.exists():
                 template = self.get_template()
                 
-                prev_date = date_obj - timedelta(days=1)
-                prev_file = self.repo_path / prev_date.strftime("%Y") / prev_date.strftime("%m") / prev_date.strftime("%d") / self.config["daily_file_name"]
-                
                 use_last_date = False
                 last_date = None
                 
-                if not prev_file.exists():
+                if not template_only:
+                    # First check yesterday's date
+                    yesterday = date_obj - timedelta(days=1)
+                    yesterday_file = self.repo_path / yesterday.strftime("%Y") / yesterday.strftime("%m") / yesterday.strftime("%d") / self.config["daily_file_name"]
+                    
+                    # Then find the most recent available date
                     last_date = self.find_last_available_date(date_obj)
-                    if last_date:
-                        console.print(f"\n⚠️ Previous day's file ({prev_date.strftime(self.config['date_format'])}) not found.", style="yellow")
+                    
+                    if yesterday_file.exists():
+                        # If yesterday's file exists, ask about using it
+                        console.print(f"\nCreating file for: {date_obj.strftime(self.config['date_format'])}", style="blue")
+                        use_last_date = click.confirm(f"Do you want to carry forward tasks from yesterday ({yesterday.strftime(self.config['date_format'])})?", default=True)
+                        if use_last_date:
+                            last_date = yesterday
+                    elif last_date:
+                        # If yesterday's file doesn't exist but we found an earlier date
+                        console.print(f"\nCreating file for: {date_obj.strftime(self.config['date_format'])}", style="blue")
+                        console.print(f"Yesterday's file ({yesterday.strftime(self.config['date_format'])}) not found.", style="yellow")
                         console.print(f"Found last available date: {last_date.strftime(self.config['date_format'])}", style="blue")
-                        use_last_date = click.confirm("Do you want to carry forward tasks from this date?", default=True)
+                        use_last_date = click.confirm(f"Do you want to use tasks from {last_date.strftime(self.config['date_format'])}?", default=True)
                     else:
                         console.print("\n⚠️ No previous daily files found in the last 30 days.", style="yellow")
+                        use_last_date = False
                 
                 # Get status legend from config
                 status_info = get_status_info()

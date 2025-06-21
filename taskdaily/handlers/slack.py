@@ -19,10 +19,12 @@ class SlackHandler(OutputHandler):
         return self.formatter.format_message(tasks, date, is_report)
 
     def send(self, content: str, **kwargs) -> bool:
-        """Copy content to clipboard."""
+        """Copy content to clipboard and display preview."""
         try:
             pyperclip.copy(content)
-            rprint("[green]✓[/green] Message copied to clipboard!")
+            rprint("\n[bold]Preview of Slack message:[/bold]")
+            rprint(content)
+            rprint("\n[green]✓[/green] Message copied to clipboard!")
             return True
         except Exception as e:
             rprint(f"[red]✗[/red] Failed to copy to clipboard: {e}")

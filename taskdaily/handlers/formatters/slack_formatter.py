@@ -11,35 +11,68 @@ class SlackFormatter:
     def format_message(self, tasks: Dict[str, List[str]], date: datetime, is_report: bool = False) -> str:
         """Format tasks into a Slack message."""
         date_str = date.strftime("%Y-%m-%d")
-        header = f"*EOD Report {date_str}*" if is_report else f"*Daily Plan {date_str}*"
         sections = []
+        
+        # Add header with divider
+        header = f"{'=' * 30}\n"
+        header += f"{'EOD REPORT' if is_report else 'DAILY PLAN'} - {date_str}\n"
+        header += f"{'=' * 30}"
+        sections.append(header)
 
+        # Get planned emoji from config
+        planned_emoji = next(
+            (info['emoji'] for info in self.status_info.values() 
+             if info.get('name', '').lower() == 'planned'),
+            "📝"  # Fallback emoji
+        )
+
+        # Process each project
         for project_name, project_tasks in tasks.items():
             if not project_tasks:
                 continue
 
-            sections.append(f"\n*{project_name}*")
+            filtered_tasks = []
             for task in project_tasks:
-                task_text = self._convert_to_slack_format(task)
-                sections.append(task_text)
+                # Skip template tasks
+                if task.strip().endswith(f"New task {planned_emoji}"):
+                    continue
+                    
+                # For reports, exclude planned tasks
+                if is_report and planned_emoji in task:
+                    continue
+                    
+                # For daily plan, remove planned emoji
+                if not is_report:
+                    task = task.replace(planned_emoji, "").strip()
+                    # Clean up any double spaces from emoji removal
+                    while "  " in task:
+                        task = task.replace("  ", " ")
+                
+                filtered_tasks.append(task)
 
-        return header + "\n" + "\n".join(sections)
+            if filtered_tasks:
+                # Add project header (without bold formatting)
+                sections.append(f"\n{project_name}")
+                
+                # Add tasks with proper indentation
+                for task in filtered_tasks:
+                    task_text = self._convert_to_slack_format(task)
+                    sections.append(f"  {task_text}")
+                
+                # Add divider after each project
+                sections.append(f"{'-' * 45}")
+
+        return "\n".join(sections)
 
     def _convert_to_slack_format(self, task: str) -> str:
         """Convert markdown task format to Slack format."""
-        # Remove markdown checkbox
-        task = task.replace("- [ ]", "•").replace("- [x]", "✓")
-        
-        # Convert status emojis
-        for status in self.status_info.values():
-            emoji = status['emoji']
-            if emoji in task:
-                task = task.replace(emoji, f":{self._emoji_map.get(emoji, 'question')}:")
-        
+        # Remove markdown checkbox and add better bullet points
+        task = task.replace("- [ ]", "○").replace("- [x]", "●")
         return task
 
     def _init_emoji_map(self) -> None:
         """Initialize emoji mapping."""
+        # Base emoji map for future use if needed
         self._emoji_map = {
             "📝": "memo",
             "⚡": "zap",
@@ -48,4 +81,11 @@ class SlackFormatter:
             "➡️": "arrow_right",
             "✅": "white_check_mark",
             "🚫": "no_entry",
-        } 
+        }
+        
+        # Add any custom emojis from config
+        for status in self.status_info.values():
+            emoji = status['emoji']
+            if emoji not in self._emoji_map:
+                name = status['name'].lower().replace(" ", "_")
+                self._emoji_map[emoji] = name 

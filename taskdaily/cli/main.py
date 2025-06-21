@@ -16,11 +16,12 @@ def main():
 
 @main.command()
 @click.option('--date', '-d', help='Date in YYYY-MM-DD format (default: today)')
-def create(date: str):
+@click.option('--template-only', is_flag=True, help='Create file without carrying forward tasks')
+def create(date: str, template_only: bool):
     """Create a new daily file."""
     date_obj = parse_date(date) if date else datetime.now()
     task_manager = TaskManager()
-    task_manager.create_daily_file(date_obj)
+    task_manager.create_daily_file(date_obj, template_only=template_only)
 
 @main.command()
 @click.option('--date', '-d', help='Date in YYYY-MM-DD format (default: today)')

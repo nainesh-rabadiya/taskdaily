@@ -19,4 +19,4 @@ def get_file_path(date: datetime) -> str:
     month = f"{date.month:02d}"
     day = f"{date.day:02d}"
     
-    return os.path.join(year, month, day, "README.md") 
+    return os.path.join(year, month, day, f"{year}-{month}-{day}.md") 

@@ -24,6 +24,11 @@ A flexible and customizable daily task management system that helps you organize
 pip install taskdaily
 ```
 
+To update to the latest version:
+```bash
+pip install --upgrade taskdaily
+```
+
 ## Quick Start
 
 1. Initialize configuration (first time only):
