@@ -2,6 +2,12 @@
 
 All notable changes to TaskDaily will be documented in this file.
 
+## [2.0.1] - 2024-03-20
+
+### Fixed
+- Fixed package structure to include core modules
+- Added missing package directories in setuptools configuration
+
 ## [2.0.0] - 2024-03-20
 
 ### Changed

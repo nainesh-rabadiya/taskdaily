@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "taskdaily"
-version = "0.1.6"
+version = "2.0.1"
 dynamic = ["keywords"]
 description = "A flexible daily task management system with customizable templates"
 readme = "README.md"
@@ -35,4 +35,18 @@ Repository = "https://github.com/nainesh-rabadiya/taskdaily.git"
 daily = "taskdaily.cli.main:main"
 
 [tool.setuptools]
-packages = ["taskdaily", "taskdaily.cli", "taskdaily.config", "taskdaily.handlers", "taskdaily.handlers.formatters", "taskdaily.templates", "taskdaily.utils"] 
+packages = [
+    "taskdaily",
+    "taskdaily.cli",
+    "taskdaily.config",
+    "taskdaily.core",
+    "taskdaily.core.models",
+    "taskdaily.core.interfaces",
+    "taskdaily.exceptions",
+    "taskdaily.formatters",
+    "taskdaily.handlers",
+    "taskdaily.handlers.formatters",
+    "taskdaily.storage",
+    "taskdaily.templates",
+    "taskdaily.utils"
+]
