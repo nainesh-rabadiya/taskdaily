@@ -7,6 +7,7 @@ from ..task_manager import TaskManager
 from ..handlers.slack import SlackHandler
 from ..utils import parse_date
 from .. import config_manager
+from ..config_manager import get_config
 
 @click.group()
 def main():
@@ -15,13 +16,11 @@ def main():
 
 @main.command()
 @click.option('--date', '-d', help='Date in YYYY-MM-DD format (default: today)')
-@click.option('--template-only', is_flag=True, help='Only create the daily file without updating READMEs')
-@click.option('--no-git', is_flag=True, help='Skip git operations')
-def create(date: str, template_only: bool, no_git: bool):
+def create(date: str):
     """Create a new daily file."""
     date_obj = parse_date(date) if date else datetime.now()
     task_manager = TaskManager()
-    task_manager.create_daily_file(date_obj, template_only=template_only)
+    task_manager.create_daily_file(date_obj)
 
 @main.command()
 @click.option('--date', '-d', help='Date in YYYY-MM-DD format (default: today)')
@@ -82,6 +81,49 @@ def path():
     click.echo(f"Config file: {config_manager.USER_CONFIG_FILE}")
     click.echo(f"Template file: {config_manager.USER_TEMPLATE_FILE}")
     click.echo(f"\nDefault config directory: {config_manager.DEFAULT_CONFIG_DIR}")
+
+@main.command()
+@click.argument('task_name')
+@click.option('--category', help='Task category (Personal/Work/Learning)')
+def complete(task_name: str, category: str):
+    """Mark a task as complete."""
+    date_obj = datetime.now()
+    task_manager = TaskManager()
+    success = task_manager.complete_task(task_name, category, date_obj)
+    if success:
+        click.echo(f"✅ Task '{task_name}' marked as complete.")
+    else:
+        click.echo(f"❌ Task '{task_name}' not found in category '{category}'.")
+
+@main.command()
+def share_today():
+    """Share today's tasks."""
+    date_obj = datetime.now()
+    task_manager = TaskManager()
+    tasks = task_manager.get_tasks_for_date(date_obj)
+    
+    # Get handler based on config
+    config = get_config()
+    handler = SlackHandler()
+    
+    # Format and share tasks
+    handler.share_tasks(tasks)
+    click.echo("✓ Message copied to clipboard!")
+
+@config.group()
+def config_group():
+    """Configuration commands group."""
+    pass
+
+@config_group.command(name='init')
+def config_init():
+    """Initialize configuration with default settings."""
+    task_manager.init_config()
+
+@config_group.command(name='path')
+def config_path():
+    """Show configuration paths."""
+    task_manager.show_config_paths()
 
 if __name__ == '__main__':
     main() 

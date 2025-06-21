@@ -28,4 +28,14 @@ def write_file_content(file_path: Path, content: str) -> None:
     try:
         file_path.write_text(content)
     except Exception as e:
-        raise IOError(f"Failed to write to file {file_path}: {e}") 
+        raise IOError(f"Failed to write to file {file_path}: {e}")
+
+def read_file(file_path: str) -> str:
+    """Read content from a file."""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+def write_file(file_path: str, content: str) -> None:
+    """Write content to a file."""
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(content) 

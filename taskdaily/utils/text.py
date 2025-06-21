@@ -10,13 +10,18 @@ def clean_section_header(header: str) -> str:
     """Clean section header for comparison."""
     return ' '.join(header.strip().split())
 
-def split_into_sections(content: str, markers: List[str]) -> List[str]:
+def split_into_sections(content: str, markers: List[str] = None) -> List[str]:
     """Split content into sections based on headers."""
+    if markers is None:
+        # Default project markers from config
+        config = config_manager.get_config()
+        markers = [p["emoji"] for p in config.get("projects", [])]
+        
     sections = []
     current_section = []
     
     for line in content.split('\n'):
-        if line.strip() and any(line.startswith(m) for m in markers):
+        if line.strip() and any(line.strip().startswith(m) for m in markers):
             if current_section:
                 sections.append('\n'.join(current_section))
             current_section = [line]
@@ -26,7 +31,7 @@ def split_into_sections(content: str, markers: List[str]) -> List[str]:
     if current_section:
         sections.append('\n'.join(current_section))
     
-    return sections 
+    return sections
 
 def get_status_info() -> Dict[str, Any]:
     """Get status information from config."""

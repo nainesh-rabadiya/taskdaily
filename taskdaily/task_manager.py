@@ -3,9 +3,13 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 import click
 from rich.console import Console
+import os
 
 from .utils import get_date_parts, clean_section_header, split_into_sections, get_status_info
 from . import config_manager
+from .utils.text import split_into_sections
+from .utils.file import read_file, write_file
+from .utils.date import get_file_path
 
 console = Console()
 
@@ -79,28 +83,53 @@ class TaskManager:
             
         return carried_tasks
 
-    def create_daily_file(self, date: datetime, template_only: bool = False) -> None:
-        """Create a new daily file."""
-        year, month, day = get_date_parts(date)
-        day_path = self.work_dir / year / month / day
-        day_path.mkdir(parents=True, exist_ok=True)
-
-        daily_file = day_path / self.config["daily_file_name"]
-        if daily_file.exists():
-            return
-
-        template = self._get_template()
-        prev_date = date - timedelta(days=1)
+    def create_daily_file(self, date: Optional[datetime] = None) -> str:
+        """Create a new daily task file."""
+        if date is None:
+            date = datetime.now()
         
-        # Check for tasks to carry forward
-        carried_tasks = {}
-        if not template_only:
-            carried_tasks = self.carry_forward_tasks(prev_date)
+        file_path = get_file_path(date)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        if not os.path.exists(file_path):
+            # Use default template since we don't have config paths yet
+            content = self._get_default_template()
+            content = content.replace("{date}", date.strftime("%Y-%m-%d"))
+            write_file(file_path, content)
+            print(f"✅ Created daily file: {file_path}")
+        else:
+            print(f"⚠️ Daily file already exists: {file_path}")
+        
+        return file_path
 
-        # Generate content
-        content = self._generate_daily_content(date, template, carried_tasks)
-        daily_file.write_text(content)
-        console.print(f"✅ Created daily file: {daily_file}", style="green")
+    def complete_task(self, task_name: str, category: str, date: datetime) -> bool:
+        """Mark a task as complete."""
+        file_path = get_file_path(date)
+        if not os.path.exists(file_path):
+            return False
+        
+        content = read_file(file_path)
+        lines = content.split('\n')
+        found = False
+        
+        for i, line in enumerate(lines):
+            if category in line and '##' in line:  # Found category section
+                # Look for the task in the following lines until next section
+                j = i + 1
+                while j < len(lines) and not (lines[j].startswith('##')):
+                    if task_name in lines[j] and '[ ]' in lines[j]:
+                        lines[j] = lines[j].replace('[ ]', '[x]')
+                        lines[j] = lines[j].replace('📝', '✅')
+                        found = True
+                        break
+                    j += 1
+                if found:
+                    break
+        
+        if found:
+            write_file(file_path, '\n'.join(lines))
+            return True
+        return False
 
     def _get_template(self) -> str:
         """Get the template content."""
@@ -141,4 +170,34 @@ class TaskManager:
             date=date.strftime("%Y-%m-%d"),
             status_legend=status_legend,
             projects="\n\n".join(project_sections)
-        ) 
+        )
+
+    def _get_default_template(self) -> str:
+        """Get default template content."""
+        return """# Daily Tasks - {date}
+
+## Status Legend
+📝 Planned | ⚡ In Progress | 🚧 Blocked | 📅 Rescheduled | ➡️ Carried Forward | ✅ Completed | 🚫 Cancelled
+
+## Tasks
+
+🏠 Personal
+- [ ] New task 📝
+
+💼 Work
+- [ ] New task 📝
+
+📚 Learning
+- [ ] New task 📝
+
+## Notes
+- 
+"""
+
+    def init_config(self):
+        """Initialize configuration with default settings."""
+        config_manager.init_default_config()
+
+    def show_config_paths(self):
+        """Show configuration paths."""
+        config_manager.show_paths() 
