@@ -45,7 +45,8 @@ class SlackFormatter(FormatterInterface):
                 continue
 
             # Format project header
-            project_header = f"*{project.emoji} {project.name}*"
+            project_header = f"{project.emoji} {project.name}"
+            sections.append(project_header)
 
             # Format tasks
             task_lines = []
@@ -63,13 +64,14 @@ class SlackFormatter(FormatterInterface):
 
                 # Format task line
                 checkbox = "●" if task.is_completed else "○"
-                task_line = f"{checkbox} {task.content} {task.status_emoji}".strip()
+                task_line = f"  {checkbox} {task.content} {task.status_emoji}".strip()
                 task_lines.append(task_line)
 
             if task_lines:
-                sections.append(f"{project_header}\n" + "\n".join(task_lines))
+                sections.extend(task_lines)
+                sections.append("-" * 45)
 
-        return "\n\n".join(sections)
+        return "\n".join(sections)
 
     def _format_header(self, date_str: str, is_report: bool) -> str:
         """Format message header for Slack.
@@ -82,4 +84,4 @@ class SlackFormatter(FormatterInterface):
             Formatted header string
         """
         header_text = "EOD REPORT" if is_report else "DAILY PLAN"
-        return f"*{header_text} - {date_str}*"
+        return f"{'=' * 30}\n{header_text} - {date_str}\n{'=' * 30}"

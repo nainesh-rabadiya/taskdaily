@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "taskdaily"
-version = "2.0.1"
+version = "2.0.3"
 dynamic = ["keywords"]
 description = "A flexible daily task management system with customizable templates"
 readme = "README.md"

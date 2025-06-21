@@ -8,7 +8,7 @@ def read(fname):
 
 
 # Read version from version.py
-__version__ = "2.0.1"
+__version__ = "2.0.3"
 
 setup(
     name="taskdaily",

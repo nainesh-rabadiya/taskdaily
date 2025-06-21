@@ -74,7 +74,7 @@ class Task:
         return Task(
             content=self.content,
             project_name=self.project_name,
-            status_emoji="➡️",  # Carried forward emoji
+            status_emoji=self.status_emoji,  # Keep original status emoji
         )
 
     def to_markdown(self) -> str:

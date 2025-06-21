@@ -2,6 +2,20 @@
 
 All notable changes to TaskDaily will be documented in this file.
 
+## [2.0.3] - 2024-03-20
+
+### Fixed
+- Restored original WhatsApp formatting with equal signs for headers and dashes for section separators
+- Added proper indentation for task lines
+- Improved overall message readability
+
+## [2.0.2] - 2024-03-20
+
+### Fixed
+- Fixed WhatsApp formatting to use dashes instead of bold text for better compatibility
+- Improved task status display in WhatsApp format
+- Fixed checkbox symbols in WhatsApp format
+
 ## [2.0.1] - 2024-03-20
 
 ### Fixed
